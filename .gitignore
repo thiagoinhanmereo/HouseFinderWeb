@@ -1,0 +1,6 @@
+.local-chromium/
+bin/
+obj/
+*/node_modules
+.git
+*node_modules
