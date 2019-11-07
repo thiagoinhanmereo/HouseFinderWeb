@@ -4,3 +4,5 @@ obj/
 */node_modules
 .git
 *node_modules
+appsettings.Development.json
+appsettings.json
