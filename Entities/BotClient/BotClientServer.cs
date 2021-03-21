@@ -26,7 +26,7 @@ namespace HouseFinderWebBot
     public class BotClientService : IBotClientService
     {
         public static ITelegramBotClient BotClient;
-        public static string ChatId;
+        public static List<string> ChatIds;
         public static Browser Browser;
         private readonly IOptions<AppConfiguration> config;
 
@@ -37,7 +37,7 @@ namespace HouseFinderWebBot
             try
             {
                 BotClient = new TelegramBotClient(config.Value.TelegramBotClientKey);
-                ChatId = config.Value.ChatId;
+                ChatIds = config.Value.ChatIds.Split(";").ToList();
 
                 // For Interval in Seconds 
                 // This Scheduler will start at 11:10 and call after every 15 Seconds
@@ -101,13 +101,20 @@ namespace HouseFinderWebBot
             foreach (var apartment in apartments)
             {
                 Console.WriteLine("Sending apartment message...");
-                await BotClient.SendApartmentMessages(ChatId, apartment);
+
+                foreach (var chatId in ChatIds)
+                {
+                    await BotClient.SendApartmentMessages(chatId, apartment);
+                }
             }
         }
 
         private static async Task SendInitialMessage(List<ApartmentInfo> apartments)
         {
-            await BotClient.SendInitialMessage(ChatId, apartments);
+            foreach (var chatId in ChatIds)
+            {
+                await BotClient.SendInitialMessage(chatId, apartments);
+            }
         }
 
         public List<ApartmentInfo> FilterNewApartments(List<ApartmentInfo> apartmentsFromPage)
@@ -141,7 +148,7 @@ namespace HouseFinderWebBot
             //Make a random request to prevent server to enter in idle state
             RandomRequest();
 
-            Console.WriteLine("Getting apartments from page");
+            Console.WriteLine("Getting apartments from page v2.0");
             var apartmentsFromPage = GetAparmentsFromApi();
             //List<ApartmentInfo> apartmentsFromPage = await GetAparmentsFromPage();
 
@@ -155,7 +162,9 @@ namespace HouseFinderWebBot
         private static List<ApartmentInfo> GetAparmentsFromApi()
         {
             var apartments = new List<ApartmentInfo>();
-            string url = @"https://www.quintoandar.com.br/api/search?q=for_rent:%27true%27&fq=local:[%27-19.893207235794026,-43.98334660363921%27,%27-19.98303876420598,-43.88778739636082%27]&start=0&size=40&q.parser=structured&format=json&return=id,foto_capa,aluguel,area,quartos,custo,photos,photo_titles,variant_images,variant_images_titles,endereco,regiao_nome,cidade,visit_status,special_conditions,listing_tags,tipo,promotions,for_rent,for_sale,sale_price,condo_iptu,vagas&sort=ultima_publicacao%20desc";
+
+
+            string url = @"https://www.quintoandar.com.br/api/search?q=for_rent:%27true%27&fq=local:[%27-19.893207235794026,-43.98334660363921%27,%27-19.98303876420598,-43.88778739636082%27]&start=0&size=40&q.parser=structured&format=json&return=id,foto_capa,aluguel,area,quartos,custo,photos,photo_titles,variant_images,variant_images_titles,endereco,regiao_nome,cidade,visit_status,special_conditions,listing_tags,tipo,promotions,for_rent,for_sale,sale_price,condo_iptu,vagas&sort=first_publication%20desc";
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.ContentType = "application/json; charset=utf-8";
             request.AutomaticDecompression = DecompressionMethods.GZip;
