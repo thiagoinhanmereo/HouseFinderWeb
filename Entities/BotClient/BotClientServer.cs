@@ -12,12 +12,85 @@ using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
 
 namespace HouseFinderWebBot
 {
+    public class Shards
+    {
+        public int total { get; set; }
+        public int successful { get; set; }
+        public int skipped { get; set; }
+        public int failed { get; set; }
+    }
+
+    public class Total
+    {
+        public int value { get; set; }
+        public string relation { get; set; }
+    }
+
+    public class Source
+    {
+        public List<string> imageCaptionList { get; set; }
+        public int area { get; set; }
+        public bool forSale { get; set; }
+        public string address { get; set; }
+        public string city { get; set; }
+        public int salePrice { get; set; }
+        public string regionName { get; set; }
+        public int rent { get; set; }
+        public string type { get; set; }
+        public bool forRent { get; set; }
+        public int bedrooms { get; set; }
+        public int iptuPlusCondominium { get; set; }
+        public string visitStatus { get; set; }
+        public string coverImage { get; set; }
+        public int id { get; set; }
+        public List<string> imageList { get; set; }
+        public int parkingSpaces { get; set; }
+        public int totalCost { get; set; }
+        public List<string> activeSpecialConditions { get; set; }
+    }
+
+    public class Fields
+    {
+        public List<string> listingTags { get; set; }
+    }
+
+    public class Hit
+    {
+        public string _index { get; set; }
+        public string _type { get; set; }
+        public string _id { get; set; }
+        public object _score { get; set; }
+        public Source _source { get; set; }
+        public Fields fields { get; set; }
+        public List<object> sort { get; set; }
+        public Total total { get; set; }
+        public object max_score { get; set; }
+        public List<Hit> hits { get; set; }
+    }
+
+    public class Root
+    {
+        public int took { get; set; }
+        public bool timed_out { get; set; }
+        public Shards _shards { get; set; }
+        public Hits hits { get; set; }
+        public string search_id { get; set; }
+    }
+
+    public class Hits
+    {
+        public Total total { get; set; }
+        public decimal? max_score { get; set; }
+        public List<Hit> hits { get; set; }
+    }
+
     public interface IBotClientService
     {
 
@@ -25,6 +98,7 @@ namespace HouseFinderWebBot
 
     public class BotClientService : IBotClientService
     {
+        private static readonly HttpClient client = new HttpClient();
         public static ITelegramBotClient BotClient;
         public static List<string> ChatIds;
         public static Browser Browser;
@@ -163,22 +237,33 @@ namespace HouseFinderWebBot
         {
             var apartments = new List<ApartmentInfo>();
 
+            string filter = "{\"filters\":{\"map\":{\"bounds_north\":-19.871765235794022,\"bounds_south\":-19.961596764205975,\"bounds_east\":-43.88671987832523,\"bounds_west\":-43.982266121674755,\"center_lat\":-19.916681,\"center_lng\":-43.934493},\"cost\":{\"cost_type\":\"rent\",\"max_value\":3000,\"min_value\":500},\"availability\":\"any\",\"occupancy\":\"any\",\"sorting\":{\"criteria\":\"recent_rent\",\"order\":\"desc\"},\"page_size\":50,\"offset\":0},\"return\":[\"id\",\"coverImage\",\"rent\",\"totalCost\",\"salePrice\",\"iptuPlusCondominium\",\"area\",\"imageList\",\"imageCaptionList\",\"address\",\"regionName\",\"city\",\"visitStatus\",\"activeSpecialConditions\",\"type\",\"forRent\",\"forSale\",\"bedrooms\",\"parkingSpaces\",\"listingTags\"],\"business_context\":\"RENT\",\"user_id\":\"435dd27b-79aa-4663-a36a-10d7894401d9R\",\"context\":{\"search_filter\":{\"price_type\":\"rent\",\"price_min\":500,\"price_min_changed\":false,\"price_max\":3000,\"price_max_changed\":true,\"area_min\":20,\"area_min_changed\":false,\"area_max\":1000,\"area_max_changed\":false},\"map\":{\"bounds_north\":-19.871765235794022,\"bounds_south\":-19.961596764205975,\"bounds_east\":-43.88671987832523,\"bounds_west\":-43.982266121674755,\"center_lat\":-19.916681,\"center_lng\":-43.934493},\"search_dropdown_value\":\"Belo Horizonte, MG, Brasil\",\"dt\":\"2021-04-11T18:13:12.947Z\"}}";
+            var content = new StringContent(filter);
+            var response = client.PostAsync("https://www.quintoandar.com.br/api/yellow-pages/v2/search", content);
+            var responseString = response.Result.Content.ReadAsStringAsync();
 
-            string url = @"https://www.quintoandar.com.br/api/search?q=for_rent:%27true%27&fq=local:[%27-19.893207235794026,-43.98334660363921%27,%27-19.98303876420598,-43.88778739636082%27]&start=0&size=40&q.parser=structured&format=json&return=id,foto_capa,aluguel,area,quartos,custo,photos,photo_titles,variant_images,variant_images_titles,endereco,regiao_nome,cidade,visit_status,special_conditions,listing_tags,tipo,promotions,for_rent,for_sale,sale_price,condo_iptu,vagas&sort=first_publication%20desc";
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            request.ContentType = "application/json; charset=utf-8";
-            request.AutomaticDecompression = DecompressionMethods.GZip;
-            var response = request.GetResponse();
-
-            using (var sr = new System.IO.StreamReader(response.GetResponseStream()))
-            {
-                var jsonResult = sr.ReadToEnd();
-                var apartmentsResult = JsonConvert.DeserializeObject<ApartmensApiResult>(jsonResult);
-
-                apartments.AddRange(MapApartmentsResult(apartmentsResult));
-            }
+            Root newApartments = JsonConvert.DeserializeObject<Root>(responseString.Result);
+            apartments.AddRange(MapApartmentsResultYellowPages(newApartments));
 
             return apartments;
+        }
+
+        private static IEnumerable<ApartmentInfo> MapApartmentsResultYellowPages(Root newApartments)
+        {
+            foreach (var apartment in newApartments.hits.hits)
+            {
+                yield return new ApartmentInfo()
+                {
+                    Id = apartment._source.id,
+                    Aluguel = apartment._source.rent,
+                    Area = apartment._source.area,
+                    Total = apartment._source.totalCost,
+                    Rua = apartment._source.address,
+                    Bairro = apartment._source.regionName,
+                    Cidade = apartment._source.city,
+                    ImageRef = $"{ApartmentInfo.BaseUrl}/img/med/{apartment._source.coverImage}"
+                };
+            }
         }
 
         private static IEnumerable<ApartmentInfo> MapApartmentsResult(ApartmensApiResult apartmentsResult)
