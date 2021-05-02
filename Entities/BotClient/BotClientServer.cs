@@ -40,7 +40,7 @@ namespace HouseFinderWebBot
         public bool forSale { get; set; }
         public string address { get; set; }
         public string city { get; set; }
-        public int salePrice { get; set; }
+        public int? salePrice { get; set; }
         public string regionName { get; set; }
         public int rent { get; set; }
         public string type { get; set; }
